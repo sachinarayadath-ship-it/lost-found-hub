@@ -23,7 +23,7 @@ import wallet from "@/assets/item-wallet.jpg";
 
 const photos = [phone, wallet, keys, backpack];
 
-export const delay = (ms = 550) => new Promise((r) => setTimeout(r, ms));
+export const delay = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
 const titles: [string, string, number][] = [
   ["Black iPhone 14 with cracked case", "Electronics", 0],

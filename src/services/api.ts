@@ -32,7 +32,7 @@ export const TOKEN_KEY = "lostfound.token";
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 4000,
+  timeout: 2500,
 });
 
 /** Attach the JWT to every outgoing request. */
@@ -57,14 +57,12 @@ api.interceptors.response.use(
 );
 
 /**
- * Until the Express backend is running, every call falls back to the mock layer
- * when the network request fails. Remove `withFallback` to go live-only.
+ * Executes API request and falls back immediately to local mock data if server is unreachable.
  */
 async function withFallback<T>(request: () => Promise<T>, fallback: () => T | Promise<T>): Promise<T> {
   try {
     return await request();
   } catch {
-    await delay();
     return fallback();
   }
 }
