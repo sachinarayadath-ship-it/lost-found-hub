@@ -43,8 +43,10 @@ function LoginPage() {
   }, [hydrated, dispatch]);
 
   useEffect(() => {
-    if (user) navigate({ to: "/dashboard", replace: true });
-  }, [user, navigate]);
+    if (hydrated && user) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [hydrated, user, navigate]);
 
   useEffect(() => {
     dispatch(clearError());
@@ -122,7 +124,7 @@ function LoginPage() {
 
           {error ? (
             <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
+              {typeof error === "string" ? error : (error as any)?.message || String(error)}
             </div>
           ) : null}
 
