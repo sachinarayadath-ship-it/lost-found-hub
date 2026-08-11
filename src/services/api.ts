@@ -32,7 +32,7 @@ export const TOKEN_KEY = "lostfound.token";
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 12000,
+  timeout: 4000,
 });
 
 /** Attach the JWT to every outgoing request. */
