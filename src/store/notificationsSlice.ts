@@ -5,7 +5,7 @@ import type { Notification } from "@/types";
 
 interface State {
   items: Notification[];
-  status: "idle" | "loading" | "failed";
+  status: "idle" | "loading" | "succeeded" | "failed";
 }
 
 const initialState: State = { items: [], status: "idle" };
@@ -34,7 +34,7 @@ const slice = createSlice({
         state.status = "loading";
       })
       .addCase(fetchNotifications.fulfilled, (state, action: PayloadAction<Notification[]>) => {
-        state.status = "idle";
+        state.status = "succeeded";
         state.items = action.payload;
       })
       .addCase(fetchNotifications.rejected, (state) => {

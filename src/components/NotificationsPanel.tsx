@@ -63,8 +63,8 @@ export function NotificationsBell() {
   const unread = items.filter((n) => !n.read).length;
 
   useEffect(() => {
-    if (items.length === 0 && status === "idle") void dispatch(fetchNotifications());
-  }, [items.length, status, dispatch]);
+    if (status === "idle") void dispatch(fetchNotifications());
+  }, [status, dispatch]);
 
   return (
     <DropdownMenu>
@@ -119,8 +119,8 @@ export function NotificationsList() {
   const { items, status } = useAppSelector((s) => s.notifications);
 
   useEffect(() => {
-    if (items.length === 0 && status === "idle") void dispatch(fetchNotifications());
-  }, [items.length, status, dispatch]);
+    if (status === "idle") void dispatch(fetchNotifications());
+  }, [status, dispatch]);
 
   if (status === "loading") {
     return (
