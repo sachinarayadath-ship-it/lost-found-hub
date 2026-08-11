@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -39,7 +39,9 @@ function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!hydrated) dispatch(hydrate());
+    if (!hydrated) {
+      dispatch(hydrate());
+    }
   }, [hydrated, dispatch]);
 
   useEffect(() => {
@@ -51,6 +53,16 @@ function LoginPage() {
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
+
+  const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setForm((prev) => (prev.email === value ? prev : { ...prev, email: value }));
+  }, []);
+
+  const handlePasswordChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setForm((prev) => (prev.password === value ? prev : { ...prev, password: value }));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +109,7 @@ function LoginPage() {
               type="email"
               autoComplete="email"
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onChange={handleEmailChange}
               aria-invalid={!!errors["email"]}
               placeholder="you@community.org"
             />
@@ -113,7 +125,7 @@ function LoginPage() {
               type="password"
               autoComplete="current-password"
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onChange={handlePasswordChange}
               aria-invalid={!!errors["password"]}
               placeholder="••••••••"
             />

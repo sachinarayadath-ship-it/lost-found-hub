@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Loader2, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -54,12 +54,18 @@ function RegisterPage() {
   }, [hydrated, dispatch]);
 
   useEffect(() => {
-    if (user) navigate({ to: "/dashboard", replace: true });
-  }, [user, navigate]);
+    if (hydrated && user) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [hydrated, user, navigate]);
 
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
+
+  const handleFieldChange = useCallback((id: keyof typeof form, value: string) => {
+    setForm((prev) => (prev[id] === value ? prev : { ...prev, [id]: value }));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +102,7 @@ function RegisterPage() {
         autoComplete={autoComplete}
         placeholder={placeholder}
         value={form[id]}
-        onChange={(e) => setForm({ ...form, [id]: e.target.value })}
+        onChange={(e) => handleFieldChange(id, e.target.value)}
         aria-invalid={!!errors[id]}
       />
       {errors[id] ? <p className="text-xs text-destructive">{errors[id]}</p> : null}
