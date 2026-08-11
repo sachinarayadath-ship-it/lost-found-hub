@@ -44,7 +44,7 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/80 bg-background/85 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-border/80 bg-background">
       <div className="container-page flex h-16 items-center gap-3">
         <Link to="/" className="flex min-w-0 shrink-0 items-center gap-2">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-hero text-primary-foreground">

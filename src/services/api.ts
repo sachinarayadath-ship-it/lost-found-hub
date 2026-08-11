@@ -32,7 +32,7 @@ export const TOKEN_KEY = "lostfound.token";
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 2500,
+  timeout: 800,
 });
 
 /** Attach the JWT to every outgoing request. */
@@ -57,12 +57,15 @@ api.interceptors.response.use(
 );
 
 /**
- * Executes API request and falls back immediately to local mock data if server is unreachable.
+ * Executes API request with a tight abort deadline, then falls back to local
+ * mock data instantly if the server is unreachable or slow.
  */
 async function withFallback<T>(request: () => Promise<T>, fallback: () => T | Promise<T>): Promise<T> {
   try {
-    return await request();
+    const result = await request();
+    return result;
   } catch {
+    // Return mock data immediately — no delay, no retry.
     return fallback();
   }
 }

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { clearError, hydrate, login } from "@/store/authSlice";
+import { clearError, login } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 export const Route = createFileRoute("/login")({
@@ -35,38 +35,37 @@ function LoginPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { status, error, user, hydrated } = useAppSelector((s) => s.auth);
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const didClearError = useRef(false);
 
-  useEffect(() => {
-    if (!hydrated) {
-      dispatch(hydrate());
-    }
-  }, [hydrated, dispatch]);
-
+  // Redirect if already logged in (Navbar handles hydration)
   useEffect(() => {
     if (hydrated && user) {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [hydrated, user, navigate]);
 
+  // Clear stale auth errors once on mount
   useEffect(() => {
-    dispatch(clearError());
+    if (!didClearError.current) {
+      didClearError.current = true;
+      dispatch(clearError());
+    }
   }, [dispatch]);
 
   const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setForm((prev) => (prev.email === value ? prev : { ...prev, email: value }));
+    setEmail(e.target.value);
   }, []);
 
   const handlePasswordChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setForm((prev) => (prev.password === value ? prev : { ...prev, password: value }));
+    setPassword(e.target.value);
   }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = schema.safeParse(form);
+    const parsed = schema.safeParse({ email, password });
     if (!parsed.success) {
       const next: Record<string, string> = {};
       for (const issue of parsed.error.issues) next[String(issue.path[0])] = issue.message;
@@ -108,7 +107,7 @@ function LoginPage() {
               id="email"
               type="email"
               autoComplete="email"
-              value={form.email}
+              value={email}
               onChange={handleEmailChange}
               aria-invalid={!!errors["email"]}
               placeholder="you@community.org"
@@ -124,7 +123,7 @@ function LoginPage() {
               id="password"
               type="password"
               autoComplete="current-password"
-              value={form.password}
+              value={password}
               onChange={handlePasswordChange}
               aria-invalid={!!errors["password"]}
               placeholder="••••••••"

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Loader2, UserPlus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { clearError, hydrate, register as registerThunk } from "@/store/authSlice";
+import { clearError, register as registerThunk } from "@/store/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 export const Route = createFileRoute("/register")({
@@ -46,30 +46,36 @@ function RegisterPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { status, error, user, hydrated } = useAppSelector((s) => s.auth);
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const didClearError = useRef(false);
 
-  useEffect(() => {
-    if (!hydrated) dispatch(hydrate());
-  }, [hydrated, dispatch]);
-
+  // Redirect if already logged in (Navbar handles hydration)
   useEffect(() => {
     if (hydrated && user) {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [hydrated, user, navigate]);
 
+  // Clear stale auth errors once on mount
   useEffect(() => {
-    dispatch(clearError());
+    if (!didClearError.current) {
+      didClearError.current = true;
+      dispatch(clearError());
+    }
   }, [dispatch]);
 
-  const handleFieldChange = useCallback((id: keyof typeof form, value: string) => {
-    setForm((prev) => (prev[id] === value ? prev : { ...prev, [id]: value }));
-  }, []);
+  const handleName = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value), []);
+  const handleEmail = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value), []);
+  const handlePassword = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value), []);
+  const handleConfirm = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirm(e.target.value), []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = schema.safeParse(form);
+    const parsed = schema.safeParse({ name, email, password, confirm });
     if (!parsed.success) {
       const next: Record<string, string> = {};
       for (const issue of parsed.error.issues) next[String(issue.path[0])] = issue.message;
@@ -77,8 +83,7 @@ function RegisterPage() {
       return;
     }
     setErrors({});
-    const { name, email, password } = parsed.data;
-    const result = await dispatch(registerThunk({ name, email, password }));
+    const result = await dispatch(registerThunk({ name: parsed.data.name, email: parsed.data.email, password: parsed.data.password }));
     if (registerThunk.fulfilled.match(result)) {
       toast.success("Account created. Welcome to LostFound+!");
       navigate({ to: "/dashboard" });
@@ -86,28 +91,6 @@ function RegisterPage() {
       toast.error("We couldn't create your account. Please try again.");
     }
   };
-
-  const field = (
-    id: keyof typeof form,
-    label: string,
-    type: string,
-    placeholder: string,
-    autoComplete: string,
-  ) => (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type={type}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={form[id]}
-        onChange={(e) => handleFieldChange(id, e.target.value)}
-        aria-invalid={!!errors[id]}
-      />
-      {errors[id] ? <p className="text-xs text-destructive">{errors[id]}</p> : null}
-    </div>
-  );
 
   return (
     <div className="container-page grid max-w-5xl gap-10 py-14 lg:grid-cols-[1fr_1.1fr] lg:items-center">
@@ -126,10 +109,26 @@ function RegisterPage() {
 
       <Card className="p-6 shadow-card sm:p-8">
         <form onSubmit={submit} className="space-y-5" noValidate>
-          {field("name", "Full name", "text", "Jane Doe", "name")}
-          {field("email", "Email address", "email", "you@community.org", "email")}
-          {field("password", "Password", "password", "At least 6 characters", "new-password")}
-          {field("confirm", "Confirm password", "password", "Repeat password", "new-password")}
+          <div className="space-y-2">
+            <Label htmlFor="name">Full name</Label>
+            <Input id="name" type="text" autoComplete="name" placeholder="Jane Doe" value={name} onChange={handleName} aria-invalid={!!errors["name"]} />
+            {errors["name"] ? <p className="text-xs text-destructive">{errors["name"]}</p> : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email address</Label>
+            <Input id="email" type="email" autoComplete="email" placeholder="you@community.org" value={email} onChange={handleEmail} aria-invalid={!!errors["email"]} />
+            {errors["email"] ? <p className="text-xs text-destructive">{errors["email"]}</p> : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input id="password" type="password" autoComplete="new-password" placeholder="At least 6 characters" value={password} onChange={handlePassword} aria-invalid={!!errors["password"]} />
+            {errors["password"] ? <p className="text-xs text-destructive">{errors["password"]}</p> : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm">Confirm password</Label>
+            <Input id="confirm" type="password" autoComplete="new-password" placeholder="Repeat password" value={confirm} onChange={handleConfirm} aria-invalid={!!errors["confirm"]} />
+            {errors["confirm"] ? <p className="text-xs text-destructive">{errors["confirm"]}</p> : null}
+          </div>
 
           {error ? (
             <div className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
