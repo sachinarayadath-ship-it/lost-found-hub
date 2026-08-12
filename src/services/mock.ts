@@ -79,8 +79,8 @@ export const MOCK_USER: User = {
 export const MOCK_ADMIN: User = {
   ...MOCK_USER,
   _id: "usr_admin",
-  name: "Moderator Ops",
-  email: "admin@community.org",
+  name: "System Admin",
+  email: "admin@lostfound.com",
   role: "admin",
 };
 
