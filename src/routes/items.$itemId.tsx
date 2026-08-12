@@ -3,14 +3,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   CalendarDays,
+  CheckCircle,
   Handshake,
   Loader2,
   Lock,
   MapPin,
+  MessageCircle,
   Send,
   Shapes,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { KindBadge, StatusBadge } from "@/components/StatusBadge";
@@ -57,6 +60,9 @@ function ItemDetailsPage() {
   const [claimMessage, setClaimMessage] = useState("");
   const [reply, setReply] = useState("");
   const [claimOpen, setClaimOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const { data: item, isLoading } = useQuery({
     queryKey: ["item", itemId],
@@ -66,7 +72,7 @@ function ItemDetailsPage() {
   const { data: thread } = useQuery({
     queryKey: ["messages", itemId],
     queryFn: () => messagesApi.thread(itemId),
-    enabled: !!user,
+    enabled: !!user && chatOpen,
   });
 
   const claim = useMutation({
@@ -85,9 +91,29 @@ function ItemDetailsPage() {
     onSuccess: () => {
       setReply("");
       void queryClient.invalidateQueries({ queryKey: ["messages", itemId] });
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const resolveItem = useMutation({
+    mutationFn: () => itemsApi.update(itemId, { status: "resolved" }),
+    onSuccess: () => {
+      toast.success("Item marked as claimed! Thank you for updating.");
+      setResolveOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleSendMessage = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (reply.trim().length < 2) return;
+      sendMessage.mutate();
+    },
+    [reply, sendMessage],
+  );
 
   if (isLoading || !item) {
     return (
@@ -102,6 +128,9 @@ function ItemDetailsPage() {
       </div>
     );
   }
+
+  const isOwner = user && item.reporter._id === user._id;
+  const isResolved = item.status === "resolved";
 
   return (
     <div className="container-page py-8">
@@ -151,70 +180,6 @@ function ItemDetailsPage() {
               </div>
             </dl>
           </Card>
-
-          <Card className="gap-4 p-6 shadow-card">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-              <h2 className="truncate text-lg font-semibold">Message the reporter</h2>
-              <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                <Lock className="size-3.5" /> Contact details stay private
-              </span>
-            </div>
-
-            {!user ? (
-              <div className="rounded-lg border border-dashed border-border bg-surface/60 p-4 text-sm text-muted-foreground">
-                <Link to="/login" className="font-semibold text-primary hover:underline">
-                  Sign in
-                </Link>{" "}
-                to message {item.reporter.name} through the in-app thread.
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {thread?.map((message) => (
-                    <div
-                      key={message._id}
-                      className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm ${
-                        message.mine
-                          ? "ml-auto bg-primary text-primary-foreground"
-                          : "bg-surface text-surface-foreground"
-                      }`}
-                    >
-                      <p>{message.body}</p>
-                      <p
-                        className={`mt-1 text-[0.7rem] ${message.mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}
-                      >
-                        {message.author} · {formatDateTime(message.createdAt)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (reply.trim().length < 2) return;
-                    sendMessage.mutate();
-                  }}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"
-                >
-                  <Textarea
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    placeholder="Add a detail only the owner would know…"
-                    rows={2}
-                    maxLength={500}
-                    className="min-w-0"
-                  />
-                  <Button type="submit" size="icon" className="self-end" aria-label="Send message">
-                    {sendMessage.isPending ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Send className="size-4" />
-                    )}
-                  </Button>
-                </form>
-              </>
-            )}
-          </Card>
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
@@ -229,42 +194,96 @@ function ItemDetailsPage() {
               {formatDate(item.createdAt)}
             </p>
 
-            <Dialog open={claimOpen} onOpenChange={setClaimOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full" size="lg" disabled={item.status === "resolved"}>
-                  <Handshake className="size-4" />
-                  {item.status === "resolved" ? "Already resolved" : "Claim this item"}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Claim “{item.title}”</DialogTitle>
-                  <DialogDescription>
-                    Describe something identifying about the item. A moderator uses this to verify
-                    ownership before handover.
-                  </DialogDescription>
-                </DialogHeader>
-                <Textarea
-                  value={claimMessage}
-                  onChange={(e) => setClaimMessage(e.target.value)}
-                  rows={4}
-                  maxLength={600}
-                  placeholder="e.g. There's a boarding pass from 12 July inside the front pocket."
-                />
-                <DialogFooter>
-                  <Button variant="ghost" onClick={() => setClaimOpen(false)}>
-                    Cancel
+            {/* ---- Action Buttons ---- */}
+            <div className="space-y-2.5">
+              {/* Claim Button */}
+              <Dialog open={claimOpen} onOpenChange={setClaimOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full" size="lg" disabled={isResolved || !!isOwner}>
+                    <Handshake className="size-4" />
+                    {isResolved ? "Already resolved" : isOwner ? "This is your report" : "Claim this item"}
                   </Button>
-                  <Button
-                    onClick={() => claim.mutate()}
-                    disabled={claimMessage.trim().length < 10 || claim.isPending}
-                  >
-                    {claim.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                    Submit claim
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Claim "{item.title}"</DialogTitle>
+                    <DialogDescription>
+                      Describe something identifying about the item. A moderator uses this to verify
+                      ownership before handover.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Textarea
+                    value={claimMessage}
+                    onChange={(e) => setClaimMessage(e.target.value)}
+                    rows={4}
+                    maxLength={600}
+                    placeholder="e.g. There's a boarding pass from 12 July inside the front pocket."
+                  />
+                  <DialogFooter>
+                    <Button variant="ghost" onClick={() => setClaimOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => claim.mutate()}
+                      disabled={claimMessage.trim().length < 10 || claim.isPending}
+                    >
+                      {claim.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+                      Submit claim
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Message Popup Button */}
+              <Button
+                variant="outline"
+                className="w-full"
+                size="lg"
+                onClick={() => {
+                  if (!user) {
+                    toast.error("Sign in to message the reporter.");
+                    return;
+                  }
+                  setChatOpen(true);
+                }}
+              >
+                <MessageCircle className="size-4" />
+                Message {isOwner ? "claimants" : "reporter"}
+              </Button>
+
+              {/* Owner: Mark as claimed */}
+              {isOwner && !isResolved ? (
+                <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="accent" className="w-full" size="lg">
+                      <CheckCircle className="size-4" />
+                      Item claimed by owner
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Mark as claimed?</DialogTitle>
+                      <DialogDescription>
+                        This will mark "{item.title}" as <strong>resolved</strong>. Other users will
+                        no longer be able to submit claims on it.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="ghost" onClick={() => setResolveOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => resolveItem.mutate()}
+                        disabled={resolveItem.isPending}
+                      >
+                        {resolveItem.isPending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle className="size-4" />}
+                        Yes, mark as claimed
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              ) : null}
+            </div>
 
             <p className="text-xs text-muted-foreground">
               {item.claimCount} claim{item.claimCount === 1 ? "" : "s"} on this item so far.
@@ -281,6 +300,87 @@ function ItemDetailsPage() {
           </Card>
         </aside>
       </div>
+
+      {/* ---- Floating Chat Popup ---- */}
+      {chatOpen && user ? (
+        <div className="fixed right-4 bottom-4 z-50 flex w-[22rem] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lift sm:right-6 sm:bottom-6 sm:w-96">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-border bg-primary px-4 py-3 text-primary-foreground">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">
+                {isOwner ? "Messages about your item" : `Message ${item.reporter.name}`}
+              </p>
+              <p className="flex items-center gap-1 text-[0.7rem] opacity-80">
+                <Lock className="size-3" /> Private · contact details hidden
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setChatOpen(false)}
+              className="grid size-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-primary-foreground/20"
+              aria-label="Close chat"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex max-h-72 flex-1 flex-col gap-2 overflow-y-auto p-4">
+            {!thread || thread.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                No messages yet. Start the conversation below.
+              </p>
+            ) : (
+              thread.map((message) => (
+                <div
+                  key={message._id}
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${
+                    message.mine
+                      ? "ml-auto rounded-br-md bg-primary text-primary-foreground"
+                      : "rounded-bl-md bg-surface text-surface-foreground"
+                  }`}
+                >
+                  <p>{message.body}</p>
+                  <p
+                    className={`mt-0.5 text-[0.65rem] ${message.mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}
+                  >
+                    {message.author} · {formatDateTime(message.createdAt)}
+                  </p>
+                </div>
+              ))
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Reply Input */}
+          <form
+            onSubmit={handleSendMessage}
+            className="flex items-end gap-2 border-t border-border bg-background p-3"
+          >
+            <Textarea
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              placeholder="Type a message…"
+              rows={1}
+              maxLength={500}
+              className="min-h-[2.5rem] min-w-0 flex-1 resize-none text-sm"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              className="size-9 shrink-0"
+              disabled={reply.trim().length < 2 || sendMessage.isPending}
+              aria-label="Send message"
+            >
+              {sendMessage.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
+            </Button>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
