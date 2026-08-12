@@ -49,24 +49,37 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem("lostfound.user");
+      // Clean Redux store session dynamically to avoid circular imports
+      import("@/store").then((m) => {
+        m.store.dispatch({ type: "auth/logout" });
+      });
     }
     const message =
       error.response?.data?.message ?? error.message ?? "Something went wrong. Please try again.";
-    return Promise.reject(new Error(message));
+    const err = new Error(message);
+    // If no response is received, it's a network error (server is offline or unreachable)
+    if (!error.response) {
+      (err as any).isNetwork = true;
+    }
+    return Promise.reject(err);
   },
 );
 
 /**
  * Executes API request with a tight abort deadline, then falls back to local
- * mock data instantly if the server is unreachable or slow.
+ * mock data instantly only if the server is unreachable (offline).
  */
 async function withFallback<T>(request: () => Promise<T>, fallback: () => T | Promise<T>): Promise<T> {
   try {
     const result = await request();
     return result;
-  } catch {
-    // Return mock data immediately — no delay, no retry.
-    return fallback();
+  } catch (error: any) {
+    // Only fall back to mock data if it is a network connectivity error
+    if (error && error.isNetwork) {
+      return fallback();
+    }
+    // Otherwise throw the real backend error (e.g. 401 Unauthorized, 400 Bad Request)
+    throw error;
   }
 }
 
