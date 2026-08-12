@@ -1,6 +1,7 @@
 const Claim = require('../models/Claim');
 const Item = require('../models/Item');
 const Notification = require('../models/Notification');
+const Message = require('../models/Message');
 
 // @desc    Submit a claim on an item
 // @route   POST /api/items/:itemId/claims, POST /api/claims
@@ -35,6 +36,14 @@ const createClaim = async (req, res, next) => {
     // Increment item claim count
     item.claimCount = (item.claimCount || 0) + 1;
     await item.save();
+
+    // Create a message in the discussion thread with the claim verification message
+    await Message.create({
+      item: itemId,
+      sender: req.user._id,
+      author: req.user.name,
+      body: `[Claim Verification]: ${message}`,
+    });
 
     // Create notification for item reporter
     await Notification.create({
@@ -139,9 +148,39 @@ const rejectClaim = async (req, res, next) => {
   }
 };
 
+// @desc    Get all claims for a specific item (only for the item owner or admin)
+// @route   GET /api/items/:itemId/claims
+// @access  Private
+const getItemClaims = async (req, res, next) => {
+  try {
+    const { itemId } = req.params;
+    const item = await Item.findById(itemId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found' });
+    }
+
+    // Only allow the reporter of the item or an admin to see the claims
+    if (item.reportedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to view claims for this item' });
+    }
+
+    const claims = await Claim.find({ item: itemId })
+      .populate({
+        path: 'claimedBy',
+        select: '_id name email phone',
+      })
+      .sort({ createdAt: -1 });
+
+    return res.json(claims);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createClaim,
   getMyClaims,
   approveClaim,
   rejectClaim,
+  getItemClaims,
 };

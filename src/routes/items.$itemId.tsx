@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   CalendarDays,
+  Check,
   CheckCircle,
   Handshake,
   Loader2,
@@ -35,6 +36,9 @@ import { claimsApi, itemsApi, messagesApi } from "@/services/api";
 import { useAppSelector } from "@/store";
 
 export const Route = createFileRoute("/items/$itemId")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    chat: search.chat === "true" || search.chat === true || undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Item details · LostFound+" },
@@ -55,12 +59,13 @@ export const Route = createFileRoute("/items/$itemId")({
 
 function ItemDetailsPage() {
   const { itemId } = Route.useParams();
+  const search = Route.useSearch();
   const queryClient = useQueryClient();
   const user = useAppSelector((s) => s.auth.user);
   const [claimMessage, setClaimMessage] = useState("");
   const [reply, setReply] = useState("");
   const [claimOpen, setClaimOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(!!search.chat);
   const [resolveOpen, setResolveOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -69,10 +74,18 @@ function ItemDetailsPage() {
     queryFn: () => itemsApi.get(itemId),
   });
 
+  const isOwner = user && item ? item.reporter._id === user._id : false;
+
   const { data: thread } = useQuery({
     queryKey: ["messages", itemId],
     queryFn: () => messagesApi.thread(itemId),
     enabled: !!user && chatOpen,
+  });
+
+  const { data: claims } = useQuery({
+    queryKey: ["item-claims", itemId],
+    queryFn: () => claimsApi.itemClaims(itemId),
+    enabled: !!user && isOwner,
   });
 
   const claim = useMutation({
@@ -82,6 +95,25 @@ function ItemDetailsPage() {
       setClaimOpen(false);
       setClaimMessage("");
       void queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const approveClaim = useMutation({
+    mutationFn: (claimId: string) => claimsApi.approve(claimId),
+    onSuccess: () => {
+      toast.success("Claim approved! The item is now marked as resolved.");
+      void queryClient.invalidateQueries({ queryKey: ["item", itemId] });
+      void queryClient.invalidateQueries({ queryKey: ["item-claims", itemId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rejectClaim = useMutation({
+    mutationFn: (claimId: string) => claimsApi.reject(claimId),
+    onSuccess: () => {
+      toast.success("Claim rejected.");
+      void queryClient.invalidateQueries({ queryKey: ["item-claims", itemId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -129,7 +161,6 @@ function ItemDetailsPage() {
     );
   }
 
-  const isOwner = user && item.reporter._id === user._id;
   const isResolved = item.status === "resolved";
 
   return (
@@ -180,6 +211,75 @@ function ItemDetailsPage() {
               </div>
             </dl>
           </Card>
+
+          {/* Claims History Panel for Owner */}
+          {isOwner && claims && claims.length > 0 ? (
+            <Card className="gap-4 p-6 shadow-card">
+              <h2 className="text-lg font-semibold flex items-center gap-2 text-primary">
+                <Handshake className="size-5" /> Claims History
+              </h2>
+              <div className="divide-y divide-border space-y-4">
+                {claims.map((c) => (
+                  <div key={c._id} className="pt-4 first:pt-0 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {c.claimedBy?.name || "Anonymous Claimant"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {c.claimedBy?.email || "No email"} • {c.claimedBy?.phone || "No phone"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={c.status} size="sm" />
+                        {c.status === "pending" && !isResolved ? (
+                          <div className="flex gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50"
+                              onClick={() => approveClaim.mutate(c._id)}
+                              disabled={approveClaim.isPending || rejectClaim.isPending}
+                              aria-label="Approve claim"
+                            >
+                              {approveClaim.isPending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Check className="size-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-destructive hover:bg-destructive/5"
+                              onClick={() => rejectClaim.mutate(c._id)}
+                              disabled={approveClaim.isPending || rejectClaim.isPending}
+                              aria-label="Reject claim"
+                            >
+                              {rejectClaim.isPending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <X className="size-4" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-surface/50 p-3.5 text-sm">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                        Verification message
+                      </p>
+                      <p className="text-foreground italic">"{c.message}"</p>
+                    </div>
+                    <p className="text-[0.7rem] text-muted-foreground">
+                      Submitted on {formatDateTime(c.createdAt)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">

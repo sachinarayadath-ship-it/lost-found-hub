@@ -9,7 +9,7 @@ const {
   getMyReports,
   getItemStats,
 } = require('../controllers/itemController');
-const { createClaim } = require('../controllers/claimController');
+const { createClaim, getItemClaims } = require('../controllers/claimController');
 const { getItemMessages, sendMessage } = require('../controllers/messageController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -33,8 +33,9 @@ router.post('/', protect, upload.single('image'), validate(itemValidator), creat
 router.put('/:id', protect, upload.single('image'), updateItem);
 router.delete('/:id', protect, deleteItem);
 
-// Submit claim on item
+// Claims on item
 router.post('/:itemId/claims', protect, validate(claimValidator), createClaim);
+router.get('/:itemId/claims', protect, getItemClaims);
 
 // Item messaging thread
 router.get('/:itemId/messages', protect, getItemMessages);

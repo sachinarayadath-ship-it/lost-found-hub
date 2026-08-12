@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Bell, CheckCheck, Handshake, MessageSquare, Sparkles, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 
@@ -21,15 +21,29 @@ const ICONS = {
   claim: Handshake,
   message: MessageSquare,
   status: RefreshCw,
+  system: Bell,
 } as const;
 
 export function NotificationRow({ notification }: { notification: Notification }) {
   const dispatch = useAppDispatch();
-  const Icon = ICONS[notification.type];
+  const navigate = useNavigate();
+  const Icon = ICONS[notification.type as keyof typeof ICONS] || ICONS.system;
+
+  const handleClick = () => {
+    dispatch(markRead(notification._id));
+    if (notification.relatedItem) {
+      navigate({
+        to: "/items/$itemId",
+        params: { itemId: notification.relatedItem },
+        search: { chat: true },
+      });
+    }
+  };
+
   return (
     <button
       type="button"
-      onClick={() => dispatch(markRead(notification._id))}
+      onClick={handleClick}
       className={cn(
         "flex w-full gap-3 rounded-lg p-3 text-left transition-colors hover:bg-surface",
         !notification.read && "bg-primary/5",

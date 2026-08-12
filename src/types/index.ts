@@ -39,6 +39,7 @@ export interface Claim {
   item: Pick<Item, "_id" | "title" | "kind" | "imageUrl" | "location" | "status">;
   status: ClaimStatus;
   message: string;
+  claimedBy?: User;
   createdAt: string;
 }
 
@@ -46,8 +47,9 @@ export interface Notification {
   _id: string;
   title: string;
   body: string;
-  type: "match" | "claim" | "status" | "message";
+  type: "match" | "claim" | "status" | "message" | "system";
   read: boolean;
+  relatedItem?: string;
   createdAt: string;
 }
 

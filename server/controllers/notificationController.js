@@ -13,6 +13,7 @@ const getNotifications = async (req, res, next) => {
       body: n.body || n.message || '',
       type: n.type || 'system',
       read: n.read,
+      relatedItem: n.relatedItem || null,
       createdAt: n.createdAt,
     }));
 

@@ -164,6 +164,21 @@ export const claimsApi = {
     ),
   mine: () =>
     withFallback(async () => (await api.get<Claim[]>("/claims/mine")).data, () => MOCK_CLAIMS),
+  itemClaims: (itemId: string) =>
+    withFallback(
+      async () => (await api.get<Claim[]>(`/items/${itemId}/claims`)).data,
+      () => MOCK_CLAIMS.filter((c) => c.item._id === itemId),
+    ),
+  approve: (claimId: string) =>
+    withFallback(
+      async () => (await api.put<{ success: boolean; claim: Claim }>(`/claims/${claimId}/approve`, {})).data,
+      () => ({ success: true, claim: { ...MOCK_CLAIMS[0]!, _id: claimId, status: "approved" as const } }),
+    ),
+  reject: (claimId: string) =>
+    withFallback(
+      async () => (await api.put<{ success: boolean; claim: Claim }>(`/claims/${claimId}/reject`, {})).data,
+      () => ({ success: true, claim: { ...MOCK_CLAIMS[0]!, _id: claimId, status: "rejected" as const } }),
+    ),
 };
 
 /* ---------------------------- messaging -------------------------------- */
