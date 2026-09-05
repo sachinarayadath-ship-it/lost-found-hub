@@ -114,7 +114,7 @@ const createItem = async (req, res, next) => {
       location,
       date: date || new Date().toISOString(),
       imageUrl,
-      status: 'pending',
+      status: req.user && req.user.role === 'admin' ? 'open' : 'pending',
       reportedBy: req.user._id,
     });
 
